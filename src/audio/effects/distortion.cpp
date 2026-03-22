@@ -1,0 +1,51 @@
+#include "audio/effects/distortion.h"
+
+namespace GuitarAmp {
+
+Distortion::Distortion() {
+    params_ = {
+        {"Drive",  2.0f,  1.0f, 20.0f,  2.0f, "x"},
+        {"Tone",   0.6f,  0.0f,  1.0f,  0.6f, ""},
+        {"Level",  0.5f,  0.0f,  1.0f,  0.5f, ""},
+    };
+}
+
+void Distortion::process(float* buffer, int num_samples) {
+    if (!enabled_) return;
+
+    float drive = params_[0].value;
+    float tone = params_[1].value;
+    float level = params_[2].value;
+
+    // Tone control: simple one-pole LP filter coefficient
+    float lp_coeff = 0.1f + tone * 0.8f;
+
+    for (int i = 0; i < num_samples; ++i) {
+        float dry = buffer[i];
+
+        // Apply drive gain
+        float x = buffer[i] * drive;
+
+        // Hard clipping with asymmetric waveshaping
+        x = std::tanh(x);
+
+        // Additional harmonic content via soft clip
+        x = soft_clip(x * 1.5f);
+
+        // Tone filter (one-pole LP)
+        lp_state_ += lp_coeff * (x - lp_state_);
+        x = lp_state_;
+
+        // Output level
+        x *= level;
+
+        // Wet/dry mix
+        buffer[i] = dry * (1.0f - mix_) + x * mix_;
+    }
+}
+
+void Distortion::reset() {
+    lp_state_ = 0.0f;
+}
+
+} // namespace GuitarAmp
