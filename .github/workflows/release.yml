@@ -1,7 +1,9 @@
 name: CD - Release Build
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI - Build and Test"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -12,6 +14,7 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -84,12 +87,14 @@ jobs:
         cp build/guitar-amp.exe release/Amplitron-Windows/Amplitron.exe
         cp README.md release/Amplitron-Windows/
         cp -r assets release/Amplitron-Windows/ || true
-        cp -r presets release/Amplitron-Windows/ || true
-        cp /mingw64/bin/libgcc_s_seh-1.dll release/Amplitron-Windows/
-        cp /mingw64/bin/libstdc++-6.dll release/Amplitron-Windows/
-        cp /mingw64/bin/libwinpthread-1.dll release/Amplitron-Windows/
-        cp /mingw64/bin/libportaudio-2.dll release/Amplitron-Windows/
-        cp /mingw64/bin/SDL2.dll release/Amplitron-Windows/
+        cp -r presets release/Amplitron-Windows/ 2>/dev/null || true
+        # Copy runtime DLLs (find actual names)
+        for dll in libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll SDL2.dll; do
+          cp /mingw64/bin/$dll release/Amplitron-Windows/ 2>/dev/null || true
+        done
+        # PortAudio DLL may have different names
+        cp /mingw64/bin/libportaudio*.dll release/Amplitron-Windows/ 2>/dev/null || true
+        ls -la release/Amplitron-Windows/
         cd release && 7z a -tzip Amplitron-Windows-x64.zip Amplitron-Windows
 
     - name: Upload to Release
