@@ -215,19 +215,22 @@ endif()
 # Target configuration: Emscripten (web) vs Native (desktop)
 # =============================================================================
 # =============================================================================
-# Shared helper: fetch SDL2 from source for mobile builds (Android / iOS)
+# Shared helper: SDL2 for mobile builds (Android / iOS)
+# Prefer a pre-installed SDL2 (e.g. from CI cache via -DSDL2_DIR=...).
+# Fall back to building from source via FetchContent for local/first-time builds.
 # =============================================================================
 if(ANDROID OR IOS)
-    include(FetchContent)
-    FetchContent_Declare(SDL2
-        URL https://github.com/libsdl-org/SDL/archive/refs/tags/release-2.30.12.tar.gz
-    )
-    # Build SDL2 as a static library so we ship a single .so / .a
-    set(SDL_STATIC  ON  CACHE BOOL "" FORCE)
-    set(SDL_SHARED  OFF CACHE BOOL "" FORCE)
-    # Suppress SDL2's own test / example targets
-    set(SDL_TEST    OFF CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(SDL2)
+    find_package(SDL2 QUIET CONFIG)
+    if(NOT TARGET SDL2::SDL2-static)
+        include(FetchContent)
+        FetchContent_Declare(SDL2
+            URL https://github.com/libsdl-org/SDL/archive/refs/tags/release-2.30.12.tar.gz
+        )
+        set(SDL_STATIC  ON  CACHE BOOL "" FORCE)
+        set(SDL_SHARED  OFF CACHE BOOL "" FORCE)
+        set(SDL_TEST    OFF CACHE BOOL "" FORCE)
+        FetchContent_MakeAvailable(SDL2)
+    endif()
 endif()
 
 if(EMSCRIPTEN)
@@ -298,8 +301,10 @@ elseif(ANDROID)
         ${CMAKE_SOURCE_DIR}/external/kiss_fft
         ${IMGUI_DIR}
         ${IMGUI_DIR}/backends
-        ${SDL2_SOURCE_DIR}/include
     )
+    if(SDL2_SOURCE_DIR)
+        target_include_directories(main PRIVATE ${SDL2_SOURCE_DIR}/include)
+    endif()
 
     target_compile_definitions(main PRIVATE
         IMGUI_IMPL_OPENGL_ES3
@@ -333,8 +338,10 @@ elseif(IOS)
         ${CMAKE_SOURCE_DIR}/external/kiss_fft
         ${IMGUI_DIR}
         ${IMGUI_DIR}/backends
-        ${SDL2_SOURCE_DIR}/include
     )
+    if(SDL2_SOURCE_DIR)
+        target_include_directories(Amplitron PRIVATE ${SDL2_SOURCE_DIR}/include)
+    endif()
 
     target_compile_definitions(Amplitron PRIVATE
         IMGUI_IMPL_OPENGL_ES3

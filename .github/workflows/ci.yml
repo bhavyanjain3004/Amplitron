@@ -508,7 +508,29 @@ jobs:
         COUNT=$(git rev-list --count HEAD)
         echo "version=0.1.${COUNT}" >> $GITHUB_OUTPUT
 
-    - name: Cache CMake configure output (Xcode project + SDL2)
+    - name: Cache SDL2 iOS static library
+      id: sdl2-ios-cache
+      uses: actions/cache@v5
+      with:
+        path: ~/sdl2-ios
+        key: sdl2-ios-arm64-2.30.12
+
+    - name: Build SDL2 for iOS
+      if: steps.sdl2-ios-cache.outputs.cache-hit != 'true'
+      run: |
+        curl -sL https://github.com/libsdl-org/SDL/archive/refs/tags/release-2.30.12.tar.gz | tar xz
+        cmake -S SDL-release-2.30.12 -B sdl2-build \
+          -G "Unix Makefiles" \
+          -DCMAKE_SYSTEM_NAME=iOS \
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+          -DCMAKE_OSX_ARCHITECTURES=arm64 \
+          -DCMAKE_INSTALL_PREFIX=$HOME/sdl2-ios \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DSDL_STATIC=ON -DSDL_SHARED=OFF -DSDL_TEST=OFF
+        cmake --build sdl2-build -j$(sysctl -n hw.ncpu)
+        cmake --install sdl2-build
+
+    - name: Cache CMake configure output (Xcode project)
       id: cmake-cache
       uses: actions/cache@v5
       with:
@@ -525,6 +547,7 @@ jobs:
           -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
           -DCMAKE_OSX_ARCHITECTURES="arm64" \
           -DAMPLITRON_VERSION="${{ steps.version.outputs.version }}" \
+          -DSDL2_DIR=$HOME/sdl2-ios/lib/cmake/SDL2 \
           -G Xcode \
           -S . -B build-ios
 
