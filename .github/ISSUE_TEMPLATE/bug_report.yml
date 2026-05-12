@@ -15,8 +15,8 @@ body:
       options:
         - label: I have searched the existing issues and this is not a duplicate.
           required: true
-        - label: I am using the latest version of Amplitron.
-          required: true
+        - label: I am using the latest version of Amplitron (if possible).
+          required: false
 
   - type: textarea
     id: description
@@ -86,6 +86,15 @@ body:
       value: |
         ### 💻 Environment & Audio Setup
         *Please provide your hardware and OS details. This is crucial for audio debugging.*
+
+  - type: input
+    id: amplitron_version
+    attributes:
+      label: Amplitron Version
+      description: Specify the version of Amplitron you are using.
+      placeholder: e.g. v1.0.2, main-branch-latest
+    validations:
+      required: true
 
   - type: input
     id: os
