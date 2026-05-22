@@ -1578,6 +1578,15 @@ TEST(effect_factory_unknown_type_returns_nullptr) {
     ASSERT_EQ(effect2, nullptr);
 }
 
+TEST(effect_type_id_matches_factory_registration) {
+    auto types = EffectFactory::instance().get_all_type_names();
+    for (const auto& type : types) {
+        auto effect = EffectFactory::instance().create(type);
+        ASSERT_NE(effect, nullptr);
+        ASSERT_EQ(std::string(effect->type_id()), type);
+    }
+}
+
 TEST(effect_base_clone_produces_independent_copy) {
     auto original = std::make_shared<Overdrive>();
     original->set_param_by_name("Drive", 2.0f);

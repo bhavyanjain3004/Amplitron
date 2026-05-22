@@ -47,6 +47,8 @@ public:
     // Display name used by the pedal board and preset serialization.
     virtual const char* name() const = 0;
 
+    virtual const char* type_id() const { return name(); }
+
     // Mutable parameter list used by controls and automation.
     virtual std::vector<EffectParam>& params() = 0;
 
