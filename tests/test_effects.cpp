@@ -1362,3 +1362,109 @@ TEST(chorus_calculates_correct_rate_from_bpm) {
     // At 120 BPM, the LFO rate should be 2.0 Hz (120 / 60)
     ASSERT_NEAR(ch.params()[0].value, 2.0f, 0.01f);
 }
+
+#include "audio/spsc_queue.h"
+#include "audio/effect_factory.h"
+
+TEST(spsc_queue_try_push_all_drains_queue) {
+    SPSCQueue<float, 8> queue;
+    ASSERT_TRUE(queue.try_push(1.0f));
+    ASSERT_TRUE(queue.try_push(2.0f));
+    ASSERT_TRUE(queue.try_push(3.0f));
+    std::vector<float> out;
+    size_t count = queue.try_pop_all(out);
+    ASSERT_EQ(count, 3u);
+    ASSERT_EQ(out.size(), 3u);
+    ASSERT_NEAR(out[0], 1.0f, 1e-6f);
+    ASSERT_NEAR(out[1], 2.0f, 1e-6f);
+    ASSERT_NEAR(out[2], 3.0f, 1e-6f);
+}
+
+TEST(spsc_queue_full_queue_rejects_push) {
+    SPSCQueue<float, 4> queue;
+    ASSERT_TRUE(queue.try_push(1.0f));
+    ASSERT_TRUE(queue.try_push(2.0f));
+    ASSERT_TRUE(queue.try_push(3.0f));
+    ASSERT_FALSE(queue.try_push(4.0f));
+}
+
+TEST(spsc_queue_try_pop_all_on_empty_returns_empty) {
+    SPSCQueue<float, 8> queue;
+    std::vector<float> out;
+    size_t count = queue.try_pop_all(out);
+    ASSERT_EQ(count, 0u);
+    ASSERT_TRUE(out.empty());
+}
+
+TEST(spsc_queue_size_and_capacity) {
+    SPSCQueue<float, 8> queue;
+    ASSERT_EQ(queue.capacity(), 7u);
+    ASSERT_EQ(queue.size(), 0u);
+    queue.try_push(1.0f);
+    ASSERT_EQ(queue.size(), 1u);
+    queue.try_push(2.0f);
+    ASSERT_EQ(queue.size(), 2u);
+    float val;
+    queue.try_pop(val);
+    ASSERT_EQ(queue.size(), 1u);
+}
+
+TEST(spsc_queue_try_peek) {
+    SPSCQueue<float, 8> queue;
+    float item = 0.0f;
+    ASSERT_FALSE(queue.try_peek(item));
+    queue.try_push(10.5f);
+    ASSERT_TRUE(queue.try_peek(item));
+    ASSERT_NEAR(item, 10.5f, 1e-6f);
+    float item2 = 0.0f;
+    ASSERT_TRUE(queue.try_pop(item2));
+    ASSERT_NEAR(item2, 10.5f, 1e-6f);
+}
+
+TEST(effect_base_get_set_param_by_name) {
+    auto effect = std::make_shared<Overdrive>();
+    effect->set_param_by_name("Drive", 2.0f);
+    ASSERT_NEAR(effect->get_param_value("Drive"), 2.0f, 1e-5f);
+}
+
+TEST(effect_base_get_param_names_not_empty) {
+    auto effect = std::make_shared<Equalizer>();
+    auto names = effect->get_param_names();
+    ASSERT_FALSE(names.empty());
+}
+
+TEST(effect_base_get_display_name) {
+    auto effect = std::make_shared<Overdrive>();
+    ASSERT_TRUE(std::strcmp(effect->get_display_name(), "Overdrive") == 0);
+}
+
+TEST(effect_factory_creates_all_registered_effects) {
+    auto types = EffectFactory::instance().get_all_type_names();
+    ASSERT_FALSE(types.empty());
+    for (const auto& type : types) {
+        auto effect = EffectFactory::instance().create(type);
+        ASSERT_NE(effect, nullptr);
+        auto effect2 = EffectFactory::instance().create_from_type(type);
+        ASSERT_NE(effect2, nullptr);
+    }
+}
+
+TEST(effect_factory_unknown_type_returns_nullptr) {
+    auto effect = EffectFactory::instance().create("nonexistent_effect_type_xyz");
+    ASSERT_EQ(effect, nullptr);
+    auto effect2 = EffectFactory::instance().create_from_type("nonexistent_effect_type_xyz");
+    ASSERT_EQ(effect2, nullptr);
+}
+
+TEST(effect_base_clone_produces_independent_copy) {
+    auto original = std::make_shared<Overdrive>();
+    original->set_param_by_name("Drive", 2.0f);
+    auto copy = original->clone();
+    ASSERT_NE(copy, nullptr);
+    ASSERT_TRUE(std::strcmp(copy->name(), original->name()) == 0);
+    ASSERT_NEAR(copy->get_param_value("Drive"), 2.0f, 1e-5f);
+    copy->set_param_by_name("Drive", 3.0f);
+    ASSERT_NEAR(original->get_param_value("Drive"), 2.0f, 1e-5f);
+    ASSERT_NEAR(copy->get_param_value("Drive"), 3.0f, 1e-5f);
+}
+

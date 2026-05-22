@@ -4,6 +4,7 @@
 #include <cstring>
 #include <vector>
 #include <string>
+#include <memory>
 #include <nlohmann/json.hpp>
 
 namespace Amplitron {
@@ -54,6 +55,38 @@ public:
 
     void set_mix(float mix) { mix_ = clamp(mix, 0.0f, 1.0f); }
     float get_mix() const { return mix_; }
+
+    virtual std::shared_ptr<Effect> clone() const;
+
+    std::vector<std::string> get_param_names() {
+        std::vector<std::string> names;
+        for (const auto& p : params()) {
+            names.push_back(p.name);
+        }
+        return names;
+    }
+
+    float get_param_value(const std::string& name) {
+        for (const auto& p : params()) {
+            if (p.name == name) {
+                return p.value;
+            }
+        }
+        return 0.0f;
+    }
+
+    void set_param_by_name(const std::string& name, float value) {
+        for (auto& p : params()) {
+            if (p.name == name) {
+                p.value = clamp(value, p.min_val, p.max_val);
+                return;
+            }
+        }
+    }
+
+    virtual const char* get_display_name() const {
+        return name();
+    }
 
     // --- AUTOMATED SERIALIZATION LOGIC ---
     // These methods automatically handle saving/loading for any effect 
