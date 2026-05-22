@@ -1590,3 +1590,85 @@ TEST(effect_base_clone_produces_independent_copy) {
     ASSERT_NEAR(copy->get_param_value("Drive"), 3.0f, 1e-5f);
 }
 
+TEST(effect_base_process_stereo_and_helpers) {
+    auto effect = std::make_shared<Overdrive>();
+    effect->set_sample_rate(44100);
+    effect->set_transport_state(120.0f);
+    float left[8] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
+    float right[8] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    effect->process_stereo(left, right, 8);
+    for (int i = 0; i < 8; ++i) {
+        ASSERT_NEAR(left[i], right[i], 1e-6f);
+    }
+}
+
+TEST(effect_base_apply_mix) {
+    auto sim = std::make_shared<CabinetSim>();
+    sim->set_mix(0.5f);
+    ASSERT_NEAR(sim->get_mix(), 0.5f, 1e-6f);
+    float buffer[8] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
+    sim->process(buffer, 8);
+    bool check = false;
+    for (int i = 0; i < 8; ++i) {
+        if (std::abs(buffer[i] - 1.0f) > 1e-6f) {
+            check = true;
+        }
+    }
+    ASSERT_TRUE(check);
+}
+
+TEST(effect_factory_duplicate_registration_throws) {
+    bool threw = false;
+    try {
+        EffectFactory::instance().register_effect("Overdrive", []() {
+            return std::make_shared<Overdrive>();
+        });
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    ASSERT_TRUE(threw);
+}
+
+class MockMixEffect : public Effect {
+public:
+    void process(float* buffer, int num_samples) override {
+        std::vector<float> dry(num_samples);
+        std::memcpy(dry.data(), buffer, static_cast<size_t>(num_samples) * sizeof(float));
+        for (int i = 0; i < num_samples; ++i) {
+            buffer[i] *= 2.0f;
+        }
+        apply_mix(dry.data(), buffer, num_samples);
+    }
+    void reset() override {}
+    const char* name() const override { return "MockMixEffect"; }
+    std::vector<EffectParam>& params() override { return params_; }
+private:
+    std::vector<EffectParam> params_;
+};
+
+TEST(effect_base_get_param_value_fallback) {
+    auto effect = std::make_shared<Overdrive>();
+    ASSERT_NEAR(effect->get_param_value("nonexistent_param"), 0.0f, 1e-6f);
+}
+
+TEST(effect_base_apply_mix_direct) {
+    MockMixEffect effect;
+    effect.set_mix(1.0f);
+    float buffer1[4] = {1.0f, 2.0f, 3.0f, 4.0f};
+    effect.process(buffer1, 4);
+    ASSERT_NEAR(buffer1[0], 2.0f, 1e-6f);
+    ASSERT_NEAR(buffer1[1], 4.0f, 1e-6f);
+    ASSERT_NEAR(buffer1[2], 6.0f, 1e-6f);
+    ASSERT_NEAR(buffer1[3], 8.0f, 1e-6f);
+
+    effect.set_mix(0.5f);
+    float buffer2[4] = {1.0f, 2.0f, 3.0f, 4.0f};
+    effect.process(buffer2, 4);
+    ASSERT_NEAR(buffer2[0], 1.5f, 1e-6f);
+    ASSERT_NEAR(buffer2[1], 3.0f, 1e-6f);
+    ASSERT_NEAR(buffer2[2], 4.5f, 1e-6f);
+    ASSERT_NEAR(buffer2[3], 6.0f, 1e-6f);
+}
+
+
+
