@@ -14,6 +14,18 @@
 
 import { test, expect, Page, ConsoleMessage } from '@playwright/test';
 
+// Emscripten injects `Module` into the page's global scope at runtime.
+// Declare it here so TypeScript doesn't report ts(2304) errors.
+declare const Module: {
+  ccall(
+    ident: string,
+    returnType: string | null,
+    argTypes: string[],
+    args: (number | string | boolean | null)[]
+  ): number | boolean | string | null;
+};
+
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
